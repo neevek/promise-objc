@@ -10,14 +10,15 @@
 
 @interface Promise : NSObject
 
-typedef id(^ResolveBlock)(id result);
-typedef id(^RejectBlock)(NSException *error);
-typedef id(^PromiseBlock)();
-typedef ResolveBlock OnFulfilledBlock;
-typedef RejectBlock OnRejectedBlock;
+typedef void(^ResolveBlock)(id result);
+typedef void(^RejectBlock)(NSException *error);
+typedef void(^PromiseBlock)(ResolveBlock, RejectBlock);
+typedef id(^OnFulfilledBlock)(id result);
+typedef id(^OnRejectedBlock)(NSException *error);
 
 +(instancetype)resolveWithObject:(id)obj;
 +(instancetype)promiseWithBlock:(PromiseBlock)promiseBlock;
+//+(instancetype)all:(NSArray *)items;
 -(instancetype)then:(OnFulfilledBlock)onFulfilled;
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected;
 -(instancetype)catch:(OnRejectedBlock)onRejected;
