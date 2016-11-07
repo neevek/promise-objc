@@ -13,6 +13,7 @@
 typedef void(^InternalResolveBlock)();
 
 @property (strong, nonatomic) id result;
+@property (nonatomic) BOOL settled;
 @property (copy, nonatomic) void(^onResolvedBlock)();
 @end
 
@@ -49,7 +50,7 @@ typedef void(^InternalResolveBlock)();
                 @try {
                     promiseBlock(resolveBlock, rejectBlock);
                 } @catch (NSException *exception) {
-                    self.result = exception;
+                    [self resolveWithResult:exception];
                 }
             });
         }
@@ -58,6 +59,11 @@ typedef void(^InternalResolveBlock)();
 }
 
 -(void)resolveWithResult:(id)result {
+    if (self.settled) {
+        return;
+    }
+    self.settled = YES;
+    
     if ([result isKindOfClass:[self class]]) {
         [result then:^id(id result) {
             [self resolveWithResult:result];
@@ -69,10 +75,11 @@ typedef void(^InternalResolveBlock)();
         return;
     }
     
-    self.result = result;
 //    NSLog(@">>>>>>>>>>>>>>>>> resolve: %@, %@, %@", self, result, self.onResolvedBlock);
+    self.result = result;
     if (self.onResolvedBlock) {
         self.onResolvedBlock();
+        self.onResolvedBlock = nil;
     }
 }
 
@@ -117,10 +124,28 @@ typedef void(^InternalResolveBlock)();
 
 
 
-
-
+-(void)feedThenableWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+    @try {
+        if ([self.result isKindOfClass:[NSException class]]) {
+            if (onRejected) {
+                self.result = onRejected(self.result);
+            }
+        } else if (onFulfilled) {
+            self.result = onFulfilled(self.result);
+        }
+    } @catch (NSException *exception) {
+        self.result = exception;
+    }
+}
 
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+    if (self.settled) {
+        dispatch_async([Promise q], ^{
+            [self feedThenableWithSettledResult:onFulfilled onRejected:onRejected];
+        });
+        return self;
+    }
+    
     __weak typeof (self) weakSelf = self;
     InternalResolveBlock prevResolveBlock = self.onResolvedBlock;
     self.onResolvedBlock = ^{
@@ -128,47 +153,19 @@ typedef void(^InternalResolveBlock)();
         // use *strong* self inside the block on purpose, so that
         // current Promise object is retained before all callbacks
         // (resolveBlock/rejectBlock/promiseBlock) finish.
-//        dispatch_async([Promise q], ^{
         
-            NSLog(@"prevResolveBlock: %@", weakSelf.result);
+        if (prevResolveBlock) {
+            prevResolveBlock();
+        }
         
-            if ([weakSelf.result isKindOfClass:[weakSelf class]]) {
-//                dispatch_async([Promise q], ^{
-//                    [result then:onFulfilled onRejected:onRejected];
-//                });
-            } else {
-                if (prevResolveBlock) {
-                    prevResolveBlock();
-                }
-                
-//        NSLog(@"resolveBlock: %@, %@, %@", weakSelf, weakSelf.result, prevResolveBlock);
-                
-                @try {
-                    if ([weakSelf.result isKindOfClass:[NSException class]]) {
-                        if (onRejected) {
-                            weakSelf.result = onRejected(weakSelf.result);
-                        }
-                    } else if (onFulfilled) {
-                        weakSelf.result = onFulfilled(weakSelf.result);
-                    }
-                } @catch (NSException *exception) {
-                    weakSelf.result = exception;
-                }
-            }
-//        });
-        weakSelf.onResolvedBlock = nil;
+        [weakSelf feedThenableWithSettledResult:onFulfilled onRejected:onRejected];
     };
-    if (self.result) {
-        dispatch_async([Promise q], ^{
-            weakSelf.onResolvedBlock();
-        });
-    }
     return self;
 }
 
-//-(void)dealloc {
-//    NSLog(@"dealloc: %@", self);
-//}
+-(void)dealloc {
+    NSLog(@"dealloc: %@", self);
+}
 
 +(dispatch_queue_t)q {
     static dispatch_queue_t q;

@@ -12,7 +12,7 @@
 
 typedef void(^ResolveBlock)(id result);
 typedef void(^RejectBlock)(NSException *error);
-typedef void(^PromiseBlock)(ResolveBlock, RejectBlock);
+typedef void(^PromiseBlock)(ResolveBlock resolve, RejectBlock reject);
 typedef id(^OnFulfilledBlock)(id result);
 typedef id(^OnRejectedBlock)(NSException *error);
 
