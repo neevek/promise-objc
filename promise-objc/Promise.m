@@ -14,7 +14,7 @@ typedef void(^InternalResolveBlock)();
 
 @property (strong, nonatomic) id result;
 @property (nonatomic) BOOL settled;
-@property (copy, nonatomic) void(^onResolvedBlock)();
+@property (strong, nonatomic) InternalResolveBlock onResolvedBlock;
 @end
 
 @implementation Promise
@@ -35,7 +35,7 @@ typedef void(^InternalResolveBlock)();
     self = [super init];
     if (self) {
         if (promiseBlock) {
-            // __weak typeof (self) weakSelf = self;
+//             __weak typeof (self) weakSelf = self;
             // use *strong* self inside the block on purpose, so that
             // current Promise object is retained before all callbacks
             // (resolveBlock/rejectBlock/promiseBlock) finish.
@@ -60,22 +60,27 @@ typedef void(^InternalResolveBlock)();
 
 -(void)resolveWithResult:(id)result {
     if (self.settled) {
+        NSLog(@"settled");
         return;
     }
-    self.settled = YES;
     
     if ([result isKindOfClass:[self class]]) {
         [result then:^id(id result) {
-            [self resolveWithResult:result];
+            NSLog(@"resolved: %@", result);
+            dispatch_async([Promise q], ^{
+                [self resolveWithResult:result];
+            });
             return nil;
         } onRejected:^id(NSException *error) {
-            [self resolveWithResult:error];
+            dispatch_async([Promise q], ^{
+                [self resolveWithResult:error];
+            });
             return nil;
         }];
         return;
     }
     
-//    NSLog(@">>>>>>>>>>>>>>>>> resolve: %@, %@, %@", self, result, self.onResolvedBlock);
+    self.settled = YES;
     self.result = result;
     if (self.onResolvedBlock) {
         self.onResolvedBlock();
@@ -86,43 +91,10 @@ typedef void(^InternalResolveBlock)();
 -(instancetype)then:(OnFulfilledBlock)onFulfilled {
     return [self then:onFulfilled onRejected:nil];
 }
-//
-//-(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
-//    //  __weak typeof (self) weakSelf = self;
-//    // use *strong* self inside the block on purpose, so that
-//    // current Promise object is retained before all callbacks
-//    // (resolveBlock/rejectBlock/promiseBlock) finish.
-//    dispatch_async([Promise q], ^{
-//        id result = self.result;
-//        if ([result isKindOfClass:[self class]]) {
-//            dispatch_async([Promise q], ^{
-//                [result then:onFulfilled onRejected:onRejected];
-//            });
-//        } else {
-//            @try {
-//                if ([self.result isKindOfClass:[NSException class]]) {
-//                    if (onRejected) {
-//                        self.result = onRejected(result);
-//                    }
-//                } else if (onFulfilled) {
-//                    self.result = onFulfilled(result);
-//                }
-//            } @catch (NSException *exception) {
-//                self.result = exception;
-//            }
-//        }
-//    });
-//    return self;
-//}
-//
 
 -(instancetype)catch:(OnRejectedBlock)onRejected {
     return [self then:nil onRejected:onRejected];
 }
-
-
-
-
 
 -(void)feedThenableWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
     @try {
@@ -149,11 +121,6 @@ typedef void(^InternalResolveBlock)();
     __weak typeof (self) weakSelf = self;
     InternalResolveBlock prevResolveBlock = self.onResolvedBlock;
     self.onResolvedBlock = ^{
-        //  __weak typeof (self) weakSelf = self;
-        // use *strong* self inside the block on purpose, so that
-        // current Promise object is retained before all callbacks
-        // (resolveBlock/rejectBlock/promiseBlock) finish.
-        
         if (prevResolveBlock) {
             prevResolveBlock();
         }
@@ -176,22 +143,5 @@ typedef void(^InternalResolveBlock)();
     
     return q;
 }
-
-//+(dispatch_queue_t)q {
-//    const static int qCount = 5;
-//    static dispatch_queue_t q[qCount];
-//    static dispatch_once_t oncePredicate[qCount];
-//    static int index = 0;
-//    @synchronized (self) {
-//        index = (index + 1) % qCount;
-//        dispatch_once(&oncePredicate[index], ^{
-//            const int nameLen = 24+1+1;
-//            char name[nameLen] = {0};
-//            sprintf(name, "net.neevek.promise-objc_%d", index);
-//            q[index] = dispatch_queue_create(name, DISPATCH_QUEUE_SERIAL);
-//        });
-//    }
-//    return q[index];
-//}
 
 @end

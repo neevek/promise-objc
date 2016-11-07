@@ -45,37 +45,58 @@ void test2() {
     }];
 }
 
+
+Promise *p() {
+    return [[Promise alloc] init];
+}
+
 void test3() {
-    Promise *p1 = [[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+    Promise *p1 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
         NSLog(@"P1 run");
-        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            sleep(1);
-            resolve(@"P1");
-        });
+//        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+//            sleep(1);
+//            resolve(@"P1");
+//        });
         
         @throw [NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil];
-    }] then:^id(id result) {
-        NSLog(@"%@-2", result);
-        return [NSString stringWithFormat:@"%@-2", result];
-    }] then:^id(id result) {
-        NSLog(@"%@-3", result);
-        return [NSString stringWithFormat:@"%@-3", result];
     }];
     
-    Promise *p2 = [Promise resolveWithObject:p1];
-    [p2 then:^id(id result) {
-        NSLog(@"%@-P2", result);
-        return [NSString stringWithFormat:@"%@-1", result];
-    }];
+//    [p1 then:^id(id result) {
+//        NSLog(@"then called: %@", result);
+//        return nil;
+//    }];
     
-    NSLog(@"%@, %@", p1, p2);
+//    Promise *p1 = [[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+//        NSLog(@"P1 run");
+////        dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+////            sleep(1);
+////            resolve(@"P1");
+////        });
+//        
+//                    @throw [NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil];
+//    }] then:^id(id result) {
+//        NSLog(@"%@-2", result);
+//        return [NSString stringWithFormat:@"%@-2", result];
+//    }] then:^id(id result) {
+//        NSLog(@"%@-3", result);
+//        return [NSString stringWithFormat:@"%@-3", result];
+//    }];
+    
+//    Promise *p2 = [Promise resolveWithObject:p1];
+//    [p2 then:^id(id result) {
+//        NSLog(@"%@-P2", result);
+//        return [NSString stringWithFormat:@"%@-1", result];
+//    }];
+//    
+//    NSLog(@"%@, %@", p1, p2);
 }
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
+//        test1();
 //        test2();
         test3();
-        sleep(5);
     }
+    sleep(3);
     return 0;
 }
