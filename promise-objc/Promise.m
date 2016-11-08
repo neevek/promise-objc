@@ -8,13 +8,24 @@
 
 #import "Promise.h"
 
-@interface Promise()
+typedef void(^ThenBlock)();
 
-typedef void(^InternalResolveBlock)();
+@interface ThenBlockWrapper : NSObject
+@property (strong, nonatomic) ThenBlock thenBlock;
+@property (strong, nonatomic) ThenBlockWrapper *next;
+@end
+
+@implementation ThenBlockWrapper
+@end
+
+
+@interface Promise()
 
 @property (strong, nonatomic) id result;
 @property (nonatomic) BOOL settled;
-@property (strong, nonatomic) InternalResolveBlock onResolvedBlock;
+@property (nonatomic) BOOL callingThenables;
+@property (strong, nonatomic) ThenBlockWrapper *thenBlockWrapper;
+@property (weak, nonatomic) ThenBlockWrapper *lastThenBlockWrapper;
 @end
 
 @implementation Promise
@@ -63,28 +74,11 @@ typedef void(^InternalResolveBlock)();
         NSLog(@"settled");
         return;
     }
-    
-    if ([result isKindOfClass:[self class]]) {
-        [result then:^id(id result) {
-            NSLog(@"resolved: %@", result);
-            dispatch_async([Promise q], ^{
-                [self resolveWithResult:result];
-            });
-            return nil;
-        } onRejected:^id(NSException *error) {
-            dispatch_async([Promise q], ^{
-                [self resolveWithResult:error];
-            });
-            return nil;
-        }];
-        return;
-    }
-    
     self.settled = YES;
     self.result = result;
-    if (self.onResolvedBlock) {
-        self.onResolvedBlock();
-        self.onResolvedBlock = nil;
+    if (self.thenBlockWrapper) {
+        self.callingThenables = YES;
+        self.thenBlockWrapper.thenBlock();
     }
 }
 
@@ -97,6 +91,23 @@ typedef void(^InternalResolveBlock)();
 }
 
 -(void)feedThenableWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+    if ([self.result isKindOfClass:[self class]]) {
+        [self.result then:^id(id result) {
+            self.result = result;
+            if (self.thenBlockWrapper) {
+                self.thenBlockWrapper.thenBlock();
+            }
+            return result;
+        } onRejected:^id(NSException *error) {
+            self.result = error;
+            if (self.thenBlockWrapper) {
+                self.thenBlockWrapper.thenBlock();
+            }
+            return error;
+        }];
+        return;
+    }
+    
     @try {
         if ([self.result isKindOfClass:[NSException class]]) {
             if (onRejected) {
@@ -108,25 +119,39 @@ typedef void(^InternalResolveBlock)();
     } @catch (NSException *exception) {
         self.result = exception;
     }
+    
+    
+    if (self.thenBlockWrapper.next) {
+        self.thenBlockWrapper = self.thenBlockWrapper.next;
+        self.thenBlockWrapper.thenBlock();
+    } else {
+        self.thenBlockWrapper = nil;
+        self.lastThenBlockWrapper = nil;
+        self.callingThenables = NO;
+    }
 }
 
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
-    if (self.settled) {
-        dispatch_async([Promise q], ^{
-            [self feedThenableWithSettledResult:onFulfilled onRejected:onRejected];
-        });
-        return self;
+    ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] init];
+    if (!self.thenBlockWrapper) {
+        self.thenBlockWrapper = thenBlockWrapper;
+        self.lastThenBlockWrapper = thenBlockWrapper;
+    } else {
+        self.lastThenBlockWrapper.next = thenBlockWrapper;
+        self.lastThenBlockWrapper = thenBlockWrapper;
     }
     
     __weak typeof (self) weakSelf = self;
-    InternalResolveBlock prevResolveBlock = self.onResolvedBlock;
-    self.onResolvedBlock = ^{
-        if (prevResolveBlock) {
-            prevResolveBlock();
-        }
-        
+    thenBlockWrapper.thenBlock = ^{
         [weakSelf feedThenableWithSettledResult:onFulfilled onRejected:onRejected];
     };
+    
+    if (self.settled && !self.callingThenables) {
+        self.callingThenables = YES;
+        dispatch_async([Promise q], ^{
+            self.thenBlockWrapper.thenBlock();
+        });
+    }
     return self;
 }
 
