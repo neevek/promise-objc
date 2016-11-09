@@ -18,7 +18,7 @@ typedef id(^OnRejectedBlock)(NSException *error);
 
 +(instancetype)resolveWithObject:(id)obj;
 +(instancetype)promiseWithBlock:(PromiseBlock)promiseBlock;
-//+(instancetype)all:(NSArray *)items;
++(instancetype)all:(NSArray *)items;
 -(instancetype)then:(OnFulfilledBlock)onFulfilled;
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected;
 -(instancetype)catch:(OnRejectedBlock)onRejected;

@@ -7,8 +7,14 @@
 //
 
 #import "Promise.h"
+#ifdef __STDC_NO_ATOMICS__
+#import <libkern/OSAtomic.h>
+#else
+#include <stdatomic.h>
+#endif
 
-typedef void(^ThenBlock)();
+typedef void(^VoidBlock)();
+typedef VoidBlock ThenBlock;
 
 @interface ThenBlockWrapper : NSObject
 @property (strong, nonatomic) ThenBlock thenBlock;
@@ -37,31 +43,72 @@ typedef void(^ThenBlock)();
 +(instancetype)resolveWithObject:(id)obj {
     Promise *promise = [[Promise alloc] initWithBlock:nil];
     dispatch_async([Promise q], ^{
-        [promise resolveWithResult:obj];
+        [promise settleResult:obj];
     });
     return promise;
+}
+
++(instancetype)all:(NSArray *)items {
+    return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        NSMutableArray *resultArray = [[NSMutableArray alloc] initWithCapacity:items.count];
+        __block atomic_int count = 0;
+        
+        void(^resolveItemBlock)(NSInteger index, id item) = ^void(NSInteger index, id item) {
+            [resultArray replaceObjectAtIndex:index withObject:item];
+            atomic_fetch_add_explicit(&count, 1, memory_order_relaxed);
+            if (atomic_load_explicit(&count, memory_order_relaxed) == items.count) {
+                resolve(resultArray);
+            }
+        };
+        
+        for (NSInteger i = 0; i < items.count; ++i) {
+            [resultArray addObject:[NSNull null]];
+            
+            id item = [items objectAtIndex:i];
+            if ([item isKindOfClass:[self class]]) {
+                OnFulfilledBlock onFulfilBlock;
+                OnRejectedBlock onRejectBlock;
+                onFulfilBlock = ^id(id result) {
+                    if ([result isKindOfClass:[self class]]) {
+                        [result then:onFulfilBlock onRejected:onRejectBlock];
+                    } else {
+                        resolveItemBlock(i, result);
+                    }
+                    return result;
+                };
+                onRejectBlock = ^id(NSException *exception) {
+                    resolveItemBlock(i, exception);
+                    return exception;
+                };
+                
+                [item then:onFulfilBlock onRejected:onRejectBlock];
+            } else {
+                resolveItemBlock(i, item);
+            }
+        }
+    }];
 }
 
 -(instancetype)initWithBlock:(PromiseBlock)promiseBlock {
     self = [super init];
     if (self) {
         if (promiseBlock) {
-//             __weak typeof (self) weakSelf = self;
+            // __weak typeof (self) weakSelf = self;
             // use *strong* self inside the block on purpose, so that
-            // current Promise object is retained before all callbacks
-            // (resolveBlock/rejectBlock/promiseBlock) finish.
+            // current Promise object is retained before 'promiseBlock'
+            // resolve or reject.
             dispatch_async([Promise q], ^{
                 ResolveBlock resolveBlock = ^void(id result) {
-                    [self resolveWithResult:result];
+                    [self settleResult:result];
                 };
                 RejectBlock rejectBlock = ^void(NSException *exception) {
-                    [self resolveWithResult:exception];
+                    [self settleResult:exception];
                 };
                 
                 @try {
                     promiseBlock(resolveBlock, rejectBlock);
                 } @catch (NSException *exception) {
-                    [self resolveWithResult:exception];
+                    [self settleResult:exception];
                 }
             });
         }
@@ -69,9 +116,8 @@ typedef void(^ThenBlock)();
     return self;
 }
 
--(void)resolveWithResult:(id)result {
+-(void)settleResult:(id)result {
     if (self.settled) {
-        NSLog(@"settled");
         return;
     }
     self.settled = YES;
@@ -90,7 +136,7 @@ typedef void(^ThenBlock)();
     return [self then:nil onRejected:onRejected];
 }
 
--(void)feedThenableWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+-(void)feedCallbacksWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
     if ([self.result isKindOfClass:[self class]]) {
         [self.result then:^id(id result) {
             self.result = result;
@@ -105,29 +151,28 @@ typedef void(^ThenBlock)();
             }
             return error;
         }];
-        return;
-    }
-    
-    @try {
-        if ([self.result isKindOfClass:[NSException class]]) {
-            if (onRejected) {
-                self.result = onRejected(self.result);
-            }
-        } else if (onFulfilled) {
-            self.result = onFulfilled(self.result);
-        }
-    } @catch (NSException *exception) {
-        self.result = exception;
-    }
-    
-    
-    if (self.thenBlockWrapper.next) {
-        self.thenBlockWrapper = self.thenBlockWrapper.next;
-        self.thenBlockWrapper.thenBlock();
+        
     } else {
-        self.thenBlockWrapper = nil;
-        self.lastThenBlockWrapper = nil;
-        self.callingThenables = NO;
+        @try {
+            if ([self.result isKindOfClass:[NSException class]]) {
+                if (onRejected) {
+                    self.result = onRejected(self.result);
+                }
+            } else if (onFulfilled) {
+                self.result = onFulfilled(self.result);
+            }
+        } @catch (NSException *exception) {
+            self.result = exception;
+        }
+        
+        if (self.thenBlockWrapper.next) {
+            self.thenBlockWrapper = self.thenBlockWrapper.next;
+            self.thenBlockWrapper.thenBlock();
+        } else {
+            self.thenBlockWrapper = nil;
+            self.lastThenBlockWrapper = nil;
+            self.callingThenables = NO;
+        }
     }
 }
 
@@ -143,7 +188,7 @@ typedef void(^ThenBlock)();
     
     __weak typeof (self) weakSelf = self;
     thenBlockWrapper.thenBlock = ^{
-        [weakSelf feedThenableWithSettledResult:onFulfilled onRejected:onRejected];
+        [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
     };
     
     if (self.settled && !self.callingThenables) {
@@ -156,7 +201,7 @@ typedef void(^ThenBlock)();
 }
 
 -(void)dealloc {
-    NSLog(@"dealloc: %@", self);
+    //NSLog(@"dealloc: %@", self);
 }
 
 +(dispatch_queue_t)q {

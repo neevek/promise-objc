@@ -144,9 +144,70 @@ void test5() {
     }];
 }
 
+void test6() {
+    Promise *p1 = [[Promise resolveWithObject:@"P1"] then:^id(id result) {
+        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
+            });
+        }];
+    }];
+    
+    sleep(2);
+    
+    [[p1 then:^id(id result) {
+        return [NSString stringWithFormat:@"%@-HAHA", result];
+    }] then:^id(id result) {
+        NSLog(@"result: %@", result);
+        return nil;
+    }];
+}
+
+void test7() {
+    NSLog(@">>>>>>>>>> start");
+    Promise *p0 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
+                       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            resolve(@"PPPPPPPP0");
+        });
+    }];
+    
+    Promise *p1 = [[Promise resolveWithObject:@"P1"] then:^id(id result) {
+        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
+            });
+        }];
+    }];
+    
+    Promise *p2 = [[Promise resolveWithObject:@"P2"] then:^id(id result) {
+        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                resolve([NSString stringWithFormat:@"%@-Inner2", result]);
+            });
+        }];
+    }];
+    
+    Promise *p3 = [Promise all:@[ p0, p1, @"LITERAL_STRING", p2]];
+    
+    [[p3 then:^id(id result) {
+        NSArray *arr = (NSArray *)result;
+        return [NSString stringWithFormat:@"%@, %@", arr, arr[0]];
+    }] then:^id(id result) {
+        NSLog(@"result: %@", result);
+        NSLog(@">>>>>>>>>> end");
+        return nil;
+    }];
+}
+
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
-        test0();
+        for (int i = 0; i < 1000; ++i) {
+            test7();
+        }
     }
     sleep(10);
     return 0;
