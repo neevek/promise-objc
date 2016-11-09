@@ -11,10 +11,10 @@
 @interface Promise : NSObject
 
 typedef void(^ResolveBlock)(id result);
-typedef void(^RejectBlock)(NSException *error);
+typedef void(^RejectBlock)(NSError *error);
 typedef void(^PromiseBlock)(ResolveBlock resolve, RejectBlock reject);
 typedef id(^OnFulfilledBlock)(id result);
-typedef id(^OnRejectedBlock)(NSException *error);
+typedef id(^OnRejectedBlock)(NSError *error);
 
 +(instancetype)resolveWithObject:(id)obj;
 +(instancetype)promiseWithBlock:(PromiseBlock)promiseBlock;

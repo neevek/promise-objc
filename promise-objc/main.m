@@ -9,6 +9,10 @@
 #import <Foundation/Foundation.h>
 #import "Promise.h"
 
+NSError *makeError(NSString *domain) {
+    return [NSError errorWithDomain:domain code:0 userInfo:nil];
+}
+
 void test0() {
     [[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
         resolve(@"P1");
@@ -40,11 +44,11 @@ void test2() {
     [[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            reject([NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil]);
+            reject(makeError(@"P1-ERROR"));
         });
     }] then:^id(id result) {
         return [NSString stringWithFormat:@"%@-2", result];
-    }] catch:^id(NSException *error) {
+    }] catch:^id(NSError *error) {
         return [NSString stringWithFormat:@"%@-AFTER_ERROR", error];
     }] then:^id(id result) {
         NSLog(@"result: %@", result);
@@ -59,7 +63,7 @@ void test3() {
             resolve(@"P1");
         });
         
-//        @throw [NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil];
+//        @throw [NSError exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil];
     }] then:^id(id result) {
         return [NSString stringWithFormat:@"%@-2", result];
     }] then:^id(id result) {
@@ -163,7 +167,7 @@ void test7() {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 //                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
-                reject([NSException exceptionWithName:[NSString stringWithFormat:@"%@-ERROR", result] reason:nil userInfo:nil]);
+                reject(makeError([NSString stringWithFormat:@"%@-ERROR", result]));
             });
         }];
     }];
@@ -205,7 +209,7 @@ void test8() {
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 //                        resolve([NSString stringWithFormat:@"%@-Q1", result]);
-                          reject([NSException exceptionWithName:[NSString stringWithFormat:@"%@-ERR", result] reason:nil userInfo:nil]);
+                          reject(makeError([NSString stringWithFormat:@"%@-ERR", result]));
                     });
                 }];
                 [p then:^id(id result) {
@@ -217,7 +221,7 @@ void test8() {
                     }];
                     resolve(p2);
                     return result;
-                } onRejected:^id(NSException *error) {
+                } onRejected:^id(NSError *error) {
                     resolve(@"RECOVER");
                     return @"RECOVER";
                 }];

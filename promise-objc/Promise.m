@@ -72,7 +72,7 @@ typedef VoidBlock ThenBlock;
                     resolveItemBlock(i, result);
                     return result;
                 };
-                onRejectBlock = ^id(NSException *exception) {
+                onRejectBlock = ^id(NSError *exception) {
                     resolveItemBlock(i, exception);
                     return exception;
                 };
@@ -97,13 +97,13 @@ typedef VoidBlock ThenBlock;
                 ResolveBlock resolveBlock = ^void(id result) {
                     [self settleResult:result];
                 };
-                RejectBlock rejectBlock = ^void(NSException *exception) {
+                RejectBlock rejectBlock = ^void(NSError *exception) {
                     [self settleResult:exception];
                 };
                 
                 @try {
                     promiseBlock(resolveBlock, rejectBlock);
-                } @catch (NSException *exception) {
+                } @catch (NSError *exception) {
                     [self settleResult:exception];
                 }
             });
@@ -140,7 +140,7 @@ typedef VoidBlock ThenBlock;
                 self.thenBlockWrapper.thenBlock();
             }
             return result;
-        } onRejected:^id(NSException *error) {
+        } onRejected:^id(NSError *error) {
             self.result = error;
             if (self.thenBlockWrapper) {
                 self.thenBlockWrapper.thenBlock();
@@ -150,14 +150,14 @@ typedef VoidBlock ThenBlock;
         
     } else {
         @try {
-            if ([self.result isKindOfClass:[NSException class]]) {
+            if ([self.result isKindOfClass:[NSError class]]) {
                 if (onRejected) {
                     self.result = onRejected(self.result);
                 }
             } else if (onFulfilled) {
                 self.result = onFulfilled(self.result);
             }
-        } @catch (NSException *exception) {
+        } @catch (NSError *exception) {
             self.result = exception;
         }
         
