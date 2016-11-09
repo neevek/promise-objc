@@ -69,11 +69,7 @@ typedef VoidBlock ThenBlock;
                 OnFulfilledBlock onFulfilBlock;
                 OnRejectedBlock onRejectBlock;
                 onFulfilBlock = ^id(id result) {
-                    if ([result isKindOfClass:[self class]]) {
-                        [result then:onFulfilBlock onRejected:onRejectBlock];
-                    } else {
-                        resolveItemBlock(i, result);
-                    }
+                    resolveItemBlock(i, result);
                     return result;
                 };
                 onRejectBlock = ^id(NSException *exception) {
@@ -177,31 +173,27 @@ typedef VoidBlock ThenBlock;
 }
 
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
-    ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] init];
-    if (!self.thenBlockWrapper) {
-        self.thenBlockWrapper = thenBlockWrapper;
-        self.lastThenBlockWrapper = thenBlockWrapper;
-    } else {
-        self.lastThenBlockWrapper.next = thenBlockWrapper;
-        self.lastThenBlockWrapper = thenBlockWrapper;
-    }
-    
     __weak typeof (self) weakSelf = self;
-    thenBlockWrapper.thenBlock = ^{
-        [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
-    };
-    
-    if (self.settled && !self.callingThenables) {
-        self.callingThenables = YES;
-        dispatch_async([Promise q], ^{
+    dispatch_async([Promise q], ^{
+        ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] init];
+        thenBlockWrapper.thenBlock = ^{
+            [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
+        };
+        
+        if (!self.thenBlockWrapper) {
+            self.thenBlockWrapper = thenBlockWrapper;
+            self.lastThenBlockWrapper = thenBlockWrapper;
+        } else {
+            self.lastThenBlockWrapper.next = thenBlockWrapper;
+            self.lastThenBlockWrapper = thenBlockWrapper;
+        }
+        
+        if (self.settled && !self.callingThenables) {
+            self.callingThenables = YES;
             self.thenBlockWrapper.thenBlock();
-        });
-    }
+        }
+    });
     return self;
-}
-
--(void)dealloc {
-    //NSLog(@"dealloc: %@", self);
 }
 
 +(dispatch_queue_t)q {

@@ -18,48 +18,42 @@ void test0() {
         return [NSString stringWithFormat:@"%@-3", result];
     }] then:^id(id result) {
         NSLog(@"result: %@", result);
-        return nil;
+        return result;
     }];
 }
 
 void test1() {
     [[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-        NSLog(@"P1 run");
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             resolve(@"P1");
         });
     }] then:^id(id result) {
-        NSLog(@"%@-2", result);
         return [NSString stringWithFormat:@"%@-2", result];
     }] then:^id(id result) {
-        NSLog(@"%@-3", result);
-        return [NSString stringWithFormat:@"%@-3", result];
+        NSLog(@"result: %@", result);
+        return result;
     }];
 }
 
 void test2() {
     [[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-        NSLog(@"P1 run");
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             reject([NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil]);
         });
     }] then:^id(id result) {
-        NSLog(@"%@-2", result);
         return [NSString stringWithFormat:@"%@-2", result];
     }] catch:^id(NSException *error) {
-        NSLog(@"CAUGHT: %@", error);
-        return @"AFTER_ERROR";
+        return [NSString stringWithFormat:@"%@-AFTER_ERROR", error];
     }] then:^id(id result) {
-        NSLog(@"%@-3", result);
-        return [NSString stringWithFormat:@"%@-3", result];
+        NSLog(@"result: %@", result);
+        return result;
     }];
 }
 
 void test3() {
     Promise *p1 = [[[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-        NSLog(@"P1 run");
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             resolve(@"P1");
@@ -67,11 +61,9 @@ void test3() {
         
 //        @throw [NSException exceptionWithName:@"P1-ERROR" reason:nil userInfo:nil];
     }] then:^id(id result) {
-        NSLog(@"%@-2", result);
         return [NSString stringWithFormat:@"%@-2", result];
     }] then:^id(id result) {
         return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-            NSLog(@"Inner run");
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-Inner1", result]);
@@ -79,14 +71,12 @@ void test3() {
         }];
     }] then:^id(id result) {
         return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-            NSLog(@"Inner2 run");
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-Inner2", result]);
             });
         }];
     }] then:^id(id result) {
-        NSLog(@"%@-3", result);
         return [NSString stringWithFormat:@"%@-3", result];
     }];
     
@@ -134,8 +124,6 @@ void test5() {
         }];
     }];
     
-    sleep(2);
-    
     [[p2 then:^id(id result) {
         return [NSString stringWithFormat:@"%@-HAHA", result];
     }] then:^id(id result) {
@@ -154,8 +142,6 @@ void test6() {
         }];
     }];
     
-    sleep(2);
-    
     [[p1 then:^id(id result) {
         return [NSString stringWithFormat:@"%@-HAHA", result];
     }] then:^id(id result) {
@@ -165,11 +151,10 @@ void test6() {
 }
 
 void test7() {
-    NSLog(@">>>>>>>>>> start");
     Promise *p0 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-            resolve(@"PPPPPPPP0");
+            resolve(@"P0");
         });
     }];
     
@@ -177,14 +162,15 @@ void test7() {
         return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
-                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
+//                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
+                reject([NSException exceptionWithName:[NSString stringWithFormat:@"%@-ERROR", result] reason:nil userInfo:nil]);
             });
         }];
     }];
     
     Promise *p2 = [[Promise resolveWithObject:@"P2"] then:^id(id result) {
         return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(4 * NSEC_PER_SEC)),
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-Inner2", result]);
             });
@@ -198,17 +184,83 @@ void test7() {
         return [NSString stringWithFormat:@"%@, %@", arr, arr[0]];
     }] then:^id(id result) {
         NSLog(@"result: %@", result);
-        NSLog(@">>>>>>>>>> end");
         return nil;
+    }];
+}
+
+void test8() {
+    Promise *p0 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
+                       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            resolve(@"P0");
+        });
+    }];
+    
+    Promise *p1 = [[Promise resolveWithObject:@"P1"] then:^id(id result) {
+        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+//                resolve([NSString stringWithFormat:@"%@-Inner1", result]);
+                Promise *p = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+//                        resolve([NSString stringWithFormat:@"%@-Q1", result]);
+                          reject([NSException exceptionWithName:[NSString stringWithFormat:@"%@-ERR", result] reason:nil userInfo:nil]);
+                    });
+                }];
+                [p then:^id(id result) {
+                    Promise *p2 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+                        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                               dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                            resolve([NSString stringWithFormat:@"%@-Q2", result]);
+                        });
+                    }];
+                    resolve(p2);
+                    return result;
+                } onRejected:^id(NSException *error) {
+                    resolve(@"RECOVER");
+                    return @"RECOVER";
+                }];
+            });
+        }];
+    }];
+    
+    [p1 then:^id(id result) {
+        Promise *p11 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                   dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                resolve([NSString stringWithFormat:@"%@-Q3", result]);
+            });
+        }];
+        return p11;
+    }];
+    
+    Promise *p2 = [[Promise resolveWithObject:@"P2"] then:^id(id result) {
+        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                           dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+                resolve([NSString stringWithFormat:@"%@-Inner2", result]);
+            });
+        }];
+    }];
+    
+    Promise *p3 = [Promise all:@[ p0, p1, @"LITERAL_STRING", p2]];
+    
+    [[p3 then:^id(id result) {
+        NSArray *arr = (NSArray *)result;
+        return [NSString stringWithFormat:@"%@, %@", arr, arr[0]];
+    }] then:^id(id result) {
+        NSLog(@"result: %@", result);
+        return result;
     }];
 }
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
         for (int i = 0; i < 1000; ++i) {
-            test7();
+            test8();
         }
     }
-    sleep(10);
+    sleep(4);
     return 0;
 }
