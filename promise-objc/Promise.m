@@ -207,10 +207,6 @@ typedef NS_ENUM(NSUInteger, State) {
     return self;
 }
 
--(void)dealloc {
-    NSLog(@"dealloc: %@", self);
-}
-
 +(dispatch_queue_t)q {
     static dispatch_queue_t q;
     static dispatch_once_t oncePredicate;

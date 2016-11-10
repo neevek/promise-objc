@@ -272,9 +272,34 @@ void test8() {
     }];
 }
 
+void test9() {
+    int64_t ts1 = (int64_t)[[NSDate date] timeIntervalSince1970];
+    Promise *p1 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            resolve(@"P1");
+        });
+    }];
+    Promise *p2 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            resolve(@"P2");
+        });
+    }];
+    Promise *p3 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)), dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            resolve(@"P3");
+        });
+    }];
+    [[Promise all:@[ p1, p2, p3]] then:^id(id result) {
+        int64_t ts2 = (int64_t)[[NSDate date] timeIntervalSince1970];
+        NSLog(@"time: %zd, %zd, %zd", ts1, ts2, ts2 - ts1);
+        NSLog(@"result: %@", result);
+        return result;
+    }];
+}
+
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
-        test0();
+        test9();
 //        for (int i = 0; i < 1000; ++i) {
 //            test8();
 //        }
