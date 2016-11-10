@@ -14,12 +14,24 @@ NSError *makeError(NSString *domain) {
 }
 
 void test0() {
-    [[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
-        resolve(@"P1");
+    [[[[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        NSLog(@"P1: %@", dispatch_get_main_queue());
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
+                       dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+            reject(@"P1");
+        });
     }] then:^id(id result) {
+        NSLog(@"result: %@", result);
         return [NSString stringWithFormat:@"%@-2", result];
     }] then:^id(id result) {
+        NSLog(@"result: %@", result);
         return [NSString stringWithFormat:@"%@-3", result];
+    }] catch:^id(id result) {
+        NSLog(@"result: %@", result);
+        return [NSString stringWithFormat:@"%@-4", result];
+    }] then:^id(id result) {
+        NSLog(@"result: %@", result);
+        return [NSString stringWithFormat:@"%@-5", result];
     }] then:^id(id result) {
         NSLog(@"result: %@", result);
         return result;
@@ -209,7 +221,8 @@ void test8() {
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
 //                        resolve([NSString stringWithFormat:@"%@-Q1", result]);
-                          reject(makeError([NSString stringWithFormat:@"%@-ERR", result]));
+//                          reject(makeError([NSString stringWithFormat:@"%@-ERR", result]));
+                               reject([NSString stringWithFormat:@"new error: %@-ERR", result]);
                     });
                 }];
                 [p then:^id(id result) {
@@ -222,7 +235,7 @@ void test8() {
                     resolve(p2);
                     return result;
                 } onRejected:^id(NSError *error) {
-                    resolve(@"RECOVER");
+                    resolve([NSString stringWithFormat:@"%@-RECOVER", error]);
                     return @"RECOVER";
                 }];
             });
@@ -261,9 +274,10 @@ void test8() {
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
-        for (int i = 0; i < 1000; ++i) {
-            test8();
-        }
+        test0();
+//        for (int i = 0; i < 1000; ++i) {
+//            test8();
+//        }
     }
     sleep(4);
     return 0;

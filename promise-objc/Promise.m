@@ -20,15 +20,20 @@ typedef VoidBlock ThenBlock;
 @property (strong, nonatomic) ThenBlock thenBlock;
 @property (strong, nonatomic) ThenBlockWrapper *next;
 @end
-
 @implementation ThenBlockWrapper
 @end
 
+typedef NS_ENUM(NSUInteger, State) {
+    kStatePending,
+    kStateFulfilled,
+    kStateRejected,
+    kStateErrorCaught,
+};
 
 @interface Promise()
 
 @property (strong, nonatomic) id result;
-@property (nonatomic) BOOL settled;
+@property (nonatomic) State state;
 @property (nonatomic) BOOL callingThenables;
 @property (strong, nonatomic) ThenBlockWrapper *thenBlockWrapper;
 @property (weak, nonatomic) ThenBlockWrapper *lastThenBlockWrapper;
@@ -43,7 +48,7 @@ typedef VoidBlock ThenBlock;
 +(instancetype)resolveWithObject:(id)obj {
     Promise *promise = [[Promise alloc] initWithBlock:nil];
     dispatch_async([Promise q], ^{
-        [promise settleResult:obj];
+        [promise settleResult:obj withState:kStateFulfilled];
     });
     return promise;
 }
@@ -53,7 +58,7 @@ typedef VoidBlock ThenBlock;
         NSMutableArray *resultArray = [[NSMutableArray alloc] initWithCapacity:items.count];
         __block atomic_int count = 0;
         
-        void(^resolveItemBlock)(NSInteger index, id item) = ^void(NSInteger index, id item) {
+        void(^fulfilItemBlock)(NSInteger index, id item) = ^void(NSInteger index, id item) {
             [resultArray replaceObjectAtIndex:index withObject:item];
             atomic_fetch_add_explicit(&count, 1, memory_order_relaxed);
             if (atomic_load_explicit(&count, memory_order_relaxed) == items.count) {
@@ -69,17 +74,17 @@ typedef VoidBlock ThenBlock;
                 OnFulfilledBlock onFulfilBlock;
                 OnRejectedBlock onRejectBlock;
                 onFulfilBlock = ^id(id result) {
-                    resolveItemBlock(i, result);
+                    fulfilItemBlock(i, result);
                     return result;
                 };
-                onRejectBlock = ^id(NSError *exception) {
-                    resolveItemBlock(i, exception);
-                    return exception;
+                onRejectBlock = ^id(id error) {
+                    fulfilItemBlock(i, error);
+                    return error;
                 };
                 
                 [item then:onFulfilBlock onRejected:onRejectBlock];
             } else {
-                resolveItemBlock(i, item);
+                fulfilItemBlock(i, item);
             }
         }
     }];
@@ -95,16 +100,16 @@ typedef VoidBlock ThenBlock;
             // resolve or reject.
             dispatch_async([Promise q], ^{
                 ResolveBlock resolveBlock = ^void(id result) {
-                    [self settleResult:result];
+                    [self settleResult:result withState:kStateFulfilled];
                 };
-                RejectBlock rejectBlock = ^void(NSError *exception) {
-                    [self settleResult:exception];
+                RejectBlock rejectBlock = ^void(id error) {
+                    [self settleResult:error withState:kStateRejected];
                 };
                 
                 @try {
                     promiseBlock(resolveBlock, rejectBlock);
-                } @catch (NSError *exception) {
-                    [self settleResult:exception];
+                } @catch (NSException *error) {
+                    [self settleResult:error withState:kStateRejected];
                 }
             });
         }
@@ -112,11 +117,12 @@ typedef VoidBlock ThenBlock;
     return self;
 }
 
--(void)settleResult:(id)result {
-    if (self.settled) {
+-(void)settleResult:(id)result withState:(State)state {
+    if (self.state != kStatePending) {
         return;
     }
-    self.settled = YES;
+    
+    self.state = state;
     self.result = result;
     if (self.thenBlockWrapper) {
         self.callingThenables = YES;
@@ -140,7 +146,7 @@ typedef VoidBlock ThenBlock;
                 self.thenBlockWrapper.thenBlock();
             }
             return result;
-        } onRejected:^id(NSError *error) {
+        } onRejected:^id(id error) {
             self.result = error;
             if (self.thenBlockWrapper) {
                 self.thenBlockWrapper.thenBlock();
@@ -150,15 +156,20 @@ typedef VoidBlock ThenBlock;
         
     } else {
         @try {
-            if ([self.result isKindOfClass:[NSError class]]) {
+            if (self.state == kStateRejected) {
                 if (onRejected) {
                     self.result = onRejected(self.result);
+                    self.state = kStateErrorCaught;
                 }
-            } else if (onFulfilled) {
-                self.result = onFulfilled(self.result);
+            } else {
+                // if state is not Rejected, it is either Fulfilled or ErrorCaught
+                // we take them as Fulfilled.
+                if (onFulfilled) {
+                    self.result = onFulfilled(self.result);
+                }
             }
-        } @catch (NSError *exception) {
-            self.result = exception;
+        } @catch (NSException *error) {
+            self.result = error;
         }
         
         if (self.thenBlockWrapper.next) {
@@ -188,12 +199,16 @@ typedef VoidBlock ThenBlock;
             self.lastThenBlockWrapper = thenBlockWrapper;
         }
         
-        if (self.settled && !self.callingThenables) {
+        if (self.state != kStatePending && !self.callingThenables) {
             self.callingThenables = YES;
             self.thenBlockWrapper.thenBlock();
         }
     });
     return self;
+}
+
+-(void)dealloc {
+    NSLog(@"dealloc: %@", self);
 }
 
 +(dispatch_queue_t)q {
