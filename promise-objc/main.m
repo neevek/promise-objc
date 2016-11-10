@@ -299,11 +299,11 @@ void test9() {
 
 int main(int argc, const char * argv[]) {
     @autoreleasepool {
-        test9();
-//        for (int i = 0; i < 1000; ++i) {
-//            test8();
-//        }
+//        test9();
+        for (int i = 0; i < 1000; ++i) {
+            test8();
+        }
     }
-    sleep(4);
+    sleep(94);
     return 0;
 }

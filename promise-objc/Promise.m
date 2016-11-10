@@ -15,6 +15,12 @@
 
 typedef void(^VoidBlock)();
 typedef VoidBlock ThenBlock;
+typedef NS_ENUM(NSUInteger, State) {
+    kStatePending,
+    kStateFulfilled,
+    kStateRejected,
+    kStateErrorCaught,
+};
 
 @interface ThenBlockWrapper : NSObject
 @property (strong, nonatomic) ThenBlock thenBlock;
@@ -23,18 +29,9 @@ typedef VoidBlock ThenBlock;
 @implementation ThenBlockWrapper
 @end
 
-typedef NS_ENUM(NSUInteger, State) {
-    kStatePending,
-    kStateFulfilled,
-    kStateRejected,
-    kStateErrorCaught,
-};
-
 @interface Promise()
-
 @property (strong, nonatomic) id result;
 @property (nonatomic) State state;
-@property (nonatomic) BOOL callingThenables;
 @property (strong, nonatomic) ThenBlockWrapper *thenBlockWrapper;
 @property (weak, nonatomic) ThenBlockWrapper *lastThenBlockWrapper;
 @end
@@ -125,7 +122,6 @@ typedef NS_ENUM(NSUInteger, State) {
     self.state = state;
     self.result = result;
     if (self.thenBlockWrapper) {
-        self.callingThenables = YES;
         self.thenBlockWrapper.thenBlock();
     }
 }
@@ -178,7 +174,6 @@ typedef NS_ENUM(NSUInteger, State) {
         } else {
             self.thenBlockWrapper = nil;
             self.lastThenBlockWrapper = nil;
-            self.callingThenables = NO;
         }
     }
 }
@@ -199,8 +194,7 @@ typedef NS_ENUM(NSUInteger, State) {
             self.lastThenBlockWrapper = thenBlockWrapper;
         }
         
-        if (self.state != kStatePending && !self.callingThenables) {
-            self.callingThenables = YES;
+        if (self.state != kStatePending) {
             self.thenBlockWrapper.thenBlock();
         }
     });
