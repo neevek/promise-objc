@@ -2,7 +2,7 @@
 //  Promise.m
 //  promise-objc
 //
-//  Created by 陈小黑 on 05/11/2016.
+//  Created by neevek <i@neevek.net> on Nov. 05 2016.
 //  Copyright © 2016 neevek. All rights reserved.
 //
 
@@ -89,40 +89,36 @@ typedef NS_ENUM(NSUInteger, State) {
 
 -(instancetype)initWithBlock:(PromiseBlock)promiseBlock {
     self = [super init];
-    if (self) {
-        if (promiseBlock) {
-            // __weak typeof (self) weakSelf = self;
-            // use *strong* self inside the block on purpose, so that
-            // current Promise object is retained before 'promiseBlock'
-            // resolve or reject.
-            dispatch_async([Promise q], ^{
-                ResolveBlock resolveBlock = ^void(id result) {
-                    [self settleResult:result withState:kStateFulfilled];
-                };
-                RejectBlock rejectBlock = ^void(id error) {
-                    [self settleResult:error withState:kStateRejected];
-                };
-                
-                @try {
-                    promiseBlock(resolveBlock, rejectBlock);
-                } @catch (NSException *error) {
-                    [self settleResult:error withState:kStateRejected];
-                }
-            });
-        }
+    if (self && promiseBlock) {
+        // __weak typeof (self) weakSelf = self;
+        // use *strong* self inside the block on purpose, so that
+        // current Promise object is retained before 'promiseBlock'
+        // resolve or reject.
+        dispatch_async([Promise q], ^{
+            ResolveBlock resolveBlock = ^void(id result) {
+                [self settleResult:result withState:kStateFulfilled];
+            };
+            RejectBlock rejectBlock = ^void(id error) {
+                [self settleResult:error withState:kStateRejected];
+            };
+            
+            @try {
+                promiseBlock(resolveBlock, rejectBlock);
+            } @catch (NSException *error) {
+                [self settleResult:error withState:kStateRejected];
+            }
+        });
     }
     return self;
 }
 
 -(void)settleResult:(id)result withState:(State)state {
-    if (self.state != kStatePending) {
-        return;
-    }
-    
-    self.state = state;
-    self.result = result;
-    if (self.thenBlockWrapper) {
-        self.thenBlockWrapper.thenBlock();
+    if (self.state == kStatePending) {
+        self.state = state;
+        self.result = result;
+        if (self.thenBlockWrapper) {
+            self.thenBlockWrapper.thenBlock();
+        }
     }
 }
 

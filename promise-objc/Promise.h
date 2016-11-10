@@ -2,7 +2,7 @@
 //  Promise.h
 //  promise-objc
 //
-//  Created by 陈小黑 on 05/11/2016.
+//  Created by neevek <i@neevek.net> on Nov. 05 2016.
 //  Copyright © 2016 neevek. All rights reserved.
 //
 
