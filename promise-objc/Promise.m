@@ -23,6 +23,13 @@ typedef NS_ENUM(NSUInteger, State) {
 @property (strong, nonatomic) ThenBlockWrapper *next;
 @end
 @implementation ThenBlockWrapper
+-(instancetype)initWithThenBlock:(ThenBlock)thenBlock {
+    self = [super init];
+    if (self) {
+        self.thenBlock = thenBlock;
+    }
+    return self;
+}
 @end
 
 @interface Promise()
@@ -34,8 +41,8 @@ typedef NS_ENUM(NSUInteger, State) {
 
 @implementation Promise
 
-+(instancetype)promiseWithBlock:(PromiseBlock)promiseBlock {
-    return [[Promise alloc] initWithBlock:promiseBlock];
++(instancetype)promiseWithBlock:(Resolver)resolver {
+    return [[Promise alloc] initWithBlock:resolver];
 }
 
 +(instancetype)resolveWithObject:(id)obj {
@@ -67,7 +74,7 @@ typedef NS_ENUM(NSUInteger, State) {
             
             id item = [items objectAtIndex:i];
             if ([item isKindOfClass:[self class]]) {
-                OnFulfilledBlock onFulfilBlock;
+                OnResolvedBlock onFulfilBlock;
                 OnRejectedBlock onRejectBlock;
                 onFulfilBlock = ^id(id result) {
                     fulfilItemBlock(i, result);
@@ -86,12 +93,12 @@ typedef NS_ENUM(NSUInteger, State) {
     }];
 }
 
--(instancetype)initWithBlock:(PromiseBlock)promiseBlock {
+-(instancetype)initWithBlock:(Resolver)resolver {
     self = [super init];
-    if (self && promiseBlock) {
+    if (self && resolver) {
         // __weak typeof (self) weakSelf = self;
         // use *strong* self inside the block on purpose, so that
-        // current Promise object is retained before 'promiseBlock'
+        // current Promise object is retained before 'resolver'
         // resolve or reject.
         dispatch_async([Promise q], ^{
             ResolveBlock resolveBlock = ^void(id result) {
@@ -102,7 +109,7 @@ typedef NS_ENUM(NSUInteger, State) {
             };
             
             @try {
-                promiseBlock(resolveBlock, rejectBlock);
+                resolver(resolveBlock, rejectBlock);
             } @catch (NSException *error) {
                 [self settleResult:error withState:kStateRejected];
             }
@@ -121,15 +128,15 @@ typedef NS_ENUM(NSUInteger, State) {
     }
 }
 
--(instancetype)then:(OnFulfilledBlock)onFulfilled {
-    return [self then:onFulfilled onRejected:nil];
+-(instancetype)then:(OnResolvedBlock)onResolved {
+    return [self then:onResolved onRejected:nil];
 }
 
 -(instancetype)catch:(OnRejectedBlock)onRejected {
     return [self then:nil onRejected:onRejected];
 }
 
--(void)feedCallbacksWithSettledResult:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+-(void)feedCallbacksWithSettledResult:(OnResolvedBlock)onResolved onRejected:(OnRejectedBlock)onRejected {
     if ([self.result isKindOfClass:[self class]]) {
         [self.result then:^id(id result) {
             self.result = result;
@@ -155,8 +162,8 @@ typedef NS_ENUM(NSUInteger, State) {
             } else {
                 // if state is not Rejected, it is either Fulfilled or ErrorCaught
                 // we take them as Fulfilled.
-                if (onFulfilled) {
-                    self.result = onFulfilled(self.result);
+                if (onResolved) {
+                    self.result = onResolved(self.result);
                 }
             }
         } @catch (NSException *error) {
@@ -173,13 +180,12 @@ typedef NS_ENUM(NSUInteger, State) {
     }
 }
 
--(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
+-(instancetype)then:(OnResolvedBlock)onResolved onRejected:(OnRejectedBlock)onRejected {
     __weak typeof (self) weakSelf = self;
     dispatch_async([Promise q], ^{
-        ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] init];
-        thenBlockWrapper.thenBlock = ^{
-            [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
-        };
+        ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] initWithThenBlock:^{
+            [weakSelf feedCallbacksWithSettledResult:onResolved onRejected:onRejected];
+        }];
         
         if (!weakSelf.thenBlockWrapper) {
             weakSelf.thenBlockWrapper = thenBlockWrapper;
@@ -187,7 +193,7 @@ typedef NS_ENUM(NSUInteger, State) {
             
             // if it is the last 'then' and state is 'settled', feed it with  directly
             if (weakSelf.state != kStatePending) {
-                [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
+                [weakSelf feedCallbacksWithSettledResult:onResolved onRejected:onRejected];
             }
         } else {
             weakSelf.lastThenBlockWrapper.next = thenBlockWrapper;
