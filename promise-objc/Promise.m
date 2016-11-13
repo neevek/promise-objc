@@ -154,7 +154,7 @@ typedef NS_ENUM(NSUInteger, State) {
         
     } else {
         @try {
-            if (self.state == kStateRejected) {
+            if (self.state == kStateRejected || [self.result isKindOfClass:[NSError class]]) {
                 if (onRejected) {
                     self.result = onRejected(self.result);
                     self.state = kStateErrorCaught;
