@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		6BE6A0A21DCDFDC000015809 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 6BE6A0A11DCDFDC000015809 /* main.m */; };
+		6B05020F1DD767E80026F1AA /* test.m in Sources */ = {isa = PBXBuildFile; fileRef = 6B05020E1DD767E80026F1AA /* test.m */; };
 		6BE6A0AA1DCDFDDB00015809 /* Promise.m in Sources */ = {isa = PBXBuildFile; fileRef = 6BE6A0A91DCDFDDB00015809 /* Promise.m */; };
 /* End PBXBuildFile section */
 
@@ -24,8 +24,8 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		6B05020E1DD767E80026F1AA /* test.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = test.m; sourceTree = "<group>"; };
 		6BE6A09E1DCDFDC000015809 /* promise-objc */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = "promise-objc"; sourceTree = BUILT_PRODUCTS_DIR; };
-		6BE6A0A11DCDFDC000015809 /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		6BE6A0A81DCDFDDB00015809 /* Promise.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Promise.h; sourceTree = "<group>"; };
 		6BE6A0A91DCDFDDB00015809 /* Promise.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = Promise.m; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -60,9 +60,9 @@
 		6BE6A0A01DCDFDC000015809 /* promise-objc */ = {
 			isa = PBXGroup;
 			children = (
-				6BE6A0A11DCDFDC000015809 /* main.m */,
 				6BE6A0A81DCDFDDB00015809 /* Promise.h */,
 				6BE6A0A91DCDFDDB00015809 /* Promise.m */,
+				6B05020E1DD767E80026F1AA /* test.m */,
 			);
 			path = "promise-objc";
 			sourceTree = "<group>";
@@ -124,8 +124,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				6BE6A0A21DCDFDC000015809 /* main.m in Sources */,
 				6BE6A0AA1DCDFDDB00015809 /* Promise.m in Sources */,
+				6B05020F1DD767E80026F1AA /* test.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -222,6 +222,7 @@
 		6BE6A0A61DCDFDC000015809 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
@@ -230,6 +231,7 @@
 		6BE6A0A71DCDFDC000015809 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
 				OTHER_CFLAGS = "-fobjc-arc-exceptions";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 			};
