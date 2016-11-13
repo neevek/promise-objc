@@ -7,11 +7,7 @@
 //
 
 #import "Promise.h"
-#ifdef __STDC_NO_ATOMICS__
-#import <libkern/OSAtomic.h>
-#else
 #include <stdatomic.h>
-#endif
 
 typedef void(^VoidBlock)();
 typedef VoidBlock ThenBlock;
@@ -30,8 +26,8 @@ typedef NS_ENUM(NSUInteger, State) {
 @end
 
 @interface Promise()
-@property (strong, nonatomic) id result;
 @property (nonatomic) State state;
+@property (strong, nonatomic) id result;
 @property (strong, nonatomic) ThenBlockWrapper *thenBlockWrapper;
 @property (weak, nonatomic) ThenBlockWrapper *lastThenBlockWrapper;
 @end
@@ -43,6 +39,10 @@ typedef NS_ENUM(NSUInteger, State) {
 }
 
 +(instancetype)resolveWithObject:(id)obj {
+    if ([obj isKindOfClass:[self class]]) {
+        return obj;
+    }
+    
     Promise *promise = [[Promise alloc] initWithBlock:nil];
     dispatch_async([Promise q], ^{
         [promise settleResult:obj withState:kStateFulfilled];
@@ -57,8 +57,7 @@ typedef NS_ENUM(NSUInteger, State) {
         
         void(^fulfilItemBlock)(NSInteger index, id item) = ^void(NSInteger index, id item) {
             [resultArray replaceObjectAtIndex:index withObject:item];
-            atomic_fetch_add_explicit(&count, 1, memory_order_relaxed);
-            if (atomic_load_explicit(&count, memory_order_relaxed) == items.count) {
+            if (++count == items.count) {
                 resolve(resultArray);
             }
         };
@@ -182,17 +181,19 @@ typedef NS_ENUM(NSUInteger, State) {
             [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
         };
         
-        if (!self.thenBlockWrapper) {
-            self.thenBlockWrapper = thenBlockWrapper;
-            self.lastThenBlockWrapper = thenBlockWrapper;
+        if (!weakSelf.thenBlockWrapper) {
+            weakSelf.thenBlockWrapper = thenBlockWrapper;
+            weakSelf.lastThenBlockWrapper = thenBlockWrapper;
+            
+            // if it is the last 'then' and state is 'settled', feed it with  directly
+            if (weakSelf.state != kStatePending) {
+                [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
+            }
         } else {
-            self.lastThenBlockWrapper.next = thenBlockWrapper;
-            self.lastThenBlockWrapper = thenBlockWrapper;
+            weakSelf.lastThenBlockWrapper.next = thenBlockWrapper;
+            weakSelf.lastThenBlockWrapper = thenBlockWrapper;
         }
         
-        if (self.state != kStatePending) {
-            self.thenBlockWrapper.thenBlock();
-        }
     });
     return self;
 }
