@@ -30,7 +30,7 @@ do {\
 atomic_int gTestCount;
 
 void testcase0() {
-    [[[[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+    [[[[[[Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             resolve(@"P1");
@@ -52,7 +52,7 @@ void testcase0() {
 }
 
 void testcase1() {
-    [[[[[[Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+    [[[[[[Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             reject(@"P1");
@@ -75,7 +75,7 @@ void testcase1() {
 }
 
 void testcase2() {
-    Promise *p0 = [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+    Promise *p0 = [Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
                        dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
             resolve(@"P0");
@@ -83,14 +83,14 @@ void testcase2() {
     }];
     
     Promise *p1 = [[[[[Promise resolveWithObject:@"P1"] then:^id(id result) {
-        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        return [Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-P2", result]);
             });
         }];
     }] then:^id(id result) {
-        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        return [Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-P3", result]);
@@ -99,7 +99,7 @@ void testcase2() {
     }] then:^id(id result) {
         return [NSString stringWithFormat:@"%@-DirectReturn", result];
     }] then:^id(id result) {
-        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        return [Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2 * NSEC_PER_SEC)),
                    dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-P4", result]);
@@ -108,7 +108,7 @@ void testcase2() {
     }];
     
     Promise *p4 = [[Promise resolveWithObject:p1] then:^id(id result) {
-        return [Promise promiseWithBlock:^(ResolveBlock resolve, RejectBlock reject) {
+        return [Promise promiseWithResolver:^(ResolveBlock resolve, RejectBlock reject) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1 * NSEC_PER_SEC)),
                            dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
                 resolve([NSString stringWithFormat:@"%@-P5", result]);
