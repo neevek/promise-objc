@@ -181,27 +181,30 @@ typedef NS_ENUM(NSUInteger, State) {
 }
 
 -(instancetype)then:(OnFulfilledBlock)onFulfilled onRejected:(OnRejectedBlock)onRejected {
-    __weak typeof (self) weakSelf = self;
     dispatch_async([Promise q], ^{
         ThenBlockWrapper *thenBlockWrapper = [[ThenBlockWrapper alloc] initWithThenBlock:^{
-            [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
+            [self feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
         }];
         
-        if (!weakSelf.thenBlockWrapper) {
-            weakSelf.thenBlockWrapper = thenBlockWrapper;
-            weakSelf.lastThenBlockWrapper = thenBlockWrapper;
+        if (!self.thenBlockWrapper) {
+            self.thenBlockWrapper = thenBlockWrapper;
+            self.lastThenBlockWrapper = thenBlockWrapper;
             
             // if it is the last 'then' and state is 'settled', feed it with  directly
-            if (weakSelf.state != kStatePending) {
-                [weakSelf feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
+            if (self.state != kStatePending) {
+                [self feedCallbacksWithSettledResult:onFulfilled onRejected:onRejected];
             }
         } else {
-            weakSelf.lastThenBlockWrapper.next = thenBlockWrapper;
-            weakSelf.lastThenBlockWrapper = thenBlockWrapper;
+            self.lastThenBlockWrapper.next = thenBlockWrapper;
+            self.lastThenBlockWrapper = thenBlockWrapper;
         }
         
     });
     return self;
+}
+
+-(void)dealloc {
+    NSLog(@"dealloc: %@", self);
 }
 
 +(dispatch_queue_t)q {
