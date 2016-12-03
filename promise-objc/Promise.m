@@ -63,7 +63,9 @@ typedef NS_ENUM(NSUInteger, State) {
         __block atomic_int count = 0;
         
         void(^fulfilItemBlock)(NSInteger index, id item) = ^void(NSInteger index, id item) {
-            [resultArray replaceObjectAtIndex:index withObject:item];
+            if (item) {
+                [resultArray replaceObjectAtIndex:index withObject:item];
+            }
             if (++count == items.count) {
                 resolve(resultArray);
             }
